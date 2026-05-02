@@ -1,100 +1,94 @@
 # Smart Caps Shortcut for Windows
 
-Global hotkeys for fixing the case of selected text — anywhere you can type.
+A small utility with global hotkeys for fixing the case of selected text. Works in any app that handles Ctrl+C and Ctrl+V.
 
-The headline trick: caps-lock typo `mY NAME is jOHN dOE` → select → **Ctrl+Alt+R** →
-`My Name is John Doe`. Brands stay in their canonical form (`iphone` → `iPhone`),
-acronyms stay all-caps (`gpu` → `GPU`), URLs and code identifiers are left alone.
+The main one is Ctrl+Alt+R. If caps lock was half-on and you typed `mY NAME is jOHN dOE`, select it and press Ctrl+Alt+R. You get back `My Name is John Doe`. Brand names like `iphone` get fixed to `iPhone`, acronyms like `gpu` stay as `GPU`, and URLs or things that look like code are left alone.
 
-AutoHotkey v2 utility, ~600 lines. System tray icon, configurable hotkeys.
-Python sibling exists for reference.
+It's an AutoHotkey v2 script. There's also a Python port in the repo for reference.
 
 ## Hotkeys
 
-| Hotkey | Transform | Example |
-| --- | --- | --- |
-| `Ctrl+Alt+R` | Smart Repair | `mY NAME is jOHN dOE` → `My Name is John Doe` |
-| `Ctrl+Alt+T` | Title Case (smart — knows brands & acronyms) | `built with fastapi on the cdn` → `Built With FastAPI On The CDN` |
-| `Ctrl+Alt+U` | UPPERCASE | `hello` → `HELLO` |
-| `Ctrl+Alt+L` | lowercase | `HELLO` → `hello` |
-| `Ctrl+Alt+K` | tOGGLE cASE | `Hello` → `hELLO` |
-| `Ctrl+Alt+S` | snake_case | `getUserName` → `get_user_name` |
-| `Ctrl+Alt+M` | camelCase | `user-profile` → `userProfile` |
+| Key | Does | Example |
+|---|---|---|
+| Ctrl+Alt+R | Smart Repair | `mY NAME is jOHN dOE` → `My Name is John Doe` |
+| Ctrl+Alt+T | Title Case | `built with fastapi on the cdn` → `Built With FastAPI On The CDN` |
+| Ctrl+Alt+U | UPPERCASE | `hello` → `HELLO` |
+| Ctrl+Alt+L | lowercase | `HELLO` → `hello` |
+| Ctrl+Alt+K | Toggle | `Hello` → `hELLO` |
+| Ctrl+Alt+S | snake_case | `getUserName` → `get_user_name` |
+| Ctrl+Alt+M | camelCase | `user-profile` → `userProfile` |
 
-All configurable in [src/config.ini](src/config.ini).
+Change them in [src/config.ini](src/config.ini) if you want.
 
 ## Install
 
-1. Install AutoHotkey v2:
+Install AutoHotkey:
 
-   ```powershell
-   winget install --id AutoHotkey.AutoHotkey -e
-   ```
+```
+winget install --id AutoHotkey.AutoHotkey -e
+```
 
-2. Clone or download this repo.
-3. Double-click [start.cmd](start.cmd). Tray icon appears in ~1 second.
+Clone the repo, then double-click [start.cmd](start.cmd). The tray icon will appear.
 
-Auto-start on every login (one-time setup):
+To make it run every time you log in:
 
 ```powershell
 $wshShell = New-Object -ComObject WScript.Shell
 $lnk = $wshShell.CreateShortcut("$env:APPDATA\Microsoft\Windows\Start Menu\Programs\Startup\TextTransformer.lnk")
-$lnk.TargetPath = "$PWD\start.cmd"; $lnk.WorkingDirectory = "$PWD"; $lnk.WindowStyle = 7; $lnk.Save()
+$lnk.TargetPath = "$PWD\start.cmd"
+$lnk.WorkingDirectory = "$PWD"
+$lnk.WindowStyle = 7
+$lnk.Save()
 ```
 
-## Smart Repair rules
+## How Smart Repair decides
 
-For each whitespace-separated token in the selection:
+For each word in the selection:
 
-| Token | Repair |
-| --- | --- |
-| URL (`https://…`, `mailto:…`) or email | leave alone |
-| Has `_`, `/`, `\` (looks like code/path) | leave alone |
-| Lowercased form is in the brand list | canonical form (`iPhone`) |
-| Standalone `i` / `I` | `I` |
-| All-caps and in the acronym list | leave alone |
-| All-lowercase | leave alone (presumed intentional) |
-| Anything else | `Firstuppercase rest lowercase` |
+- URL or email: untouched
+- Has `_`, `/`, `\` in it: untouched, looks like code
+- Matches a brand: replaced with the canonical form (`iphone` becomes `iPhone`)
+- Just `i` or `I` on its own: capitalized
+- All caps and a known acronym: kept as is
+- All lowercase: kept as is, probably intentional
+- Anything else: first letter capitalized, rest lowercased
 
-Brand list (~170) and acronym list (~740) live in `[Repair]` in
-[src/config.ini](src/config.ini). Edit, then tray right-click → **Reload config**.
+About 170 brand names and 740 acronyms ship with it. They live in [src/config.ini](src/config.ini) under `[Repair]`. Add your own, then right-click the tray icon and pick Reload config.
 
-## Where it works (and doesn't)
+## Where it works
 
-**Works** in any app that honors Ctrl+C/V: VS Code, IntelliJ, Notepad, browsers
-(address bar AND text fields), Gmail, Slack, Discord, Word, Outlook, Excel,
-Teams, WhatsApp Web, Notion, Obsidian, Windows Terminal, PowerShell.
+Most apps that take Ctrl+C and Ctrl+V. VS Code, Notepad, browsers (address bar and text fields), Gmail, Slack, Discord, Word, Outlook, Teams, Notion, terminals.
 
-**Doesn't work**:
+Where it won't:
 
-- Password fields — Windows blocks programmatic paste.
-- Elevated apps when running un-elevated — UIPI blocks input injection.
-- RDP — `rdpclip.exe` is flaky; bump `RestoreDelay` if needed.
-- Some legacy console apps that ignore Ctrl+V.
+- Password fields. Windows blocks paste programmatically.
+- Elevated apps when you're not running elevated. Same security barrier.
+- RDP. Clipboard sync over RDP is unreliable. Bump RestoreDelay in config.ini.
+- Some old console apps that ignore Ctrl+V.
 
-## Layout
+## Files
 
 ```
 src/
-  TextTransformer.ahk     - main implementation (AHK v2)
-  config.ini              - hotkeys + brand/acronym lists
-  text_transformer.py     - Python sibling (reference)
+  TextTransformer.ahk     main script
+  config.ini              hotkeys and lists
+  text_transformer.py     Python port (reference)
   requirements.txt
-tests/test_transforms.py  - pytest for the pure transform functions
-tests/manual_test_plan.md - hotkey/clipboard checklist
-start.cmd                 - launcher (double-click to run)
+tests/
+  test_transforms.py      pytest
+  manual_test_plan.md     hotkey/clipboard checklist
+start.cmd                 launcher
 ```
 
 ## Tests
 
-```powershell
+```
 pip install pytest
 pytest tests/
 ```
 
-Pure functions only — no keyboard or clipboard side-effects, runs anywhere.
-The full hotkey path is in [tests/manual_test_plan.md](tests/manual_test_plan.md).
+These only cover the pure functions. The hotkey and clipboard side needs to be tested by hand, see [tests/manual_test_plan.md](tests/manual_test_plan.md).
 
 ## License
 
-MIT — see [LICENSE](LICENSE).
+MIT. See [LICENSE](LICENSE).
